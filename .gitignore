@@ -73,3 +73,6 @@ ENV/
 env.bak/
 venv.bak/
 
+#
+.spyproject/
+tox.ini
