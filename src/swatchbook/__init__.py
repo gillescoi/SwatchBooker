@@ -21,6 +21,7 @@
 from swatchbook.base import FileFormatError, Book, SwatchBook, Group, Swatch
 from swatchbook.base import Spacer, Break, Color, Tint, Tone, Pattern, Gradient
 from swatchbook.base import ColorStop, OpacityStop
+from swatchboook.icc import ICCprofile, BadICCprofile
 
 __ALL__ = ['color', 'icc', 'lcms2']
 VERSION = "0.8"

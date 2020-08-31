@@ -18,10 +18,7 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 #
-import os
-import sys
 import struct
-from datetime import *
 from math import pi, log, sin, sqrt
 from pathlib import Path
 from tempfile import mkdtemp
@@ -32,24 +29,11 @@ from collections import OrderedDict
 from PIL import Image, ImageDraw, ImageCms
 
 import swatchbook.color as color
-from swatchbook.icc import *
 import swatchbook.codecs as codecs
 import swatchbook.websvc as websvc
 
 
 VERSION = "0.8"
-
-
-# def decodeFilePath(path):
-#     if sys.platform == 'win32':
-#                 encoding = 'UTF-8'
-#             else:
-#                 encoding = sys.getfilesystemencoding()
-
-#             if encoding == 'UTF-8' and isinstance(file, str):
-#                 filename = os.path.splitext(os.path.basename(file))[0]
-#             else:
-#                 filename = os.path.splitext(os.path.basename(file))[0].decode(encoding)
 
 
 class FileFormatError(Exception):
