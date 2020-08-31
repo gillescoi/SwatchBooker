@@ -18,9 +18,9 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 #
-import os
 import struct
 import string
+from pathlib import Path
 
 
 class BadICCprofile(Exception):
@@ -33,20 +33,21 @@ class BadICCprofile(Exception):
 class ICCprofile():
     """Gets basic informations about a profile."""
 
-    def __init__(self, uri):
-        if os.path.getsize(uri) < 128:
+    def __init__(self, uri: Path):
+        self.size = uri.stat().st_size
+        if self.size < 128:
             raise BadICCprofile("That file doesn't seem to be an ICC color profile.")
+        self.uri = uri
 
-        with open(uri, 'rb') as file:
-            self.uri = uri
+        with open(self.uri, 'rb') as file:
             file.seek(0)
             size, cmm = struct.unpack('>L 4s', file.read(8))                  # Profile size
 
-            if os.path.getsize(uri) != size:
+            if self.size != size:
                 raise BadICCprofile("That file doesn't have the expected size.")
 
-            if not (all(c in string.ascii_letters + ' ' + string.digits for c in cmm) \
-                    or cmm == '\x00\x00\x00\x00'):
+            if not (all(c in string.ascii_letters + ' ' + string.digits
+                        for c in cmm.decode(encoding='ascii')) or cmm == b'\x00\x00\x00\x00'):
                 raise BadICCprofile("That file doesn't seem to be an ICC color profile.")
 
             file.seek(8)
@@ -55,14 +56,17 @@ class ICCprofile():
             self.info = {}
             self.info['version'] = (version[0], int(version1[0], 16), int(version1[1], 16))
             self.info['class'] = struct.unpack('4s', file.read(4))[0]      # Profile/Device Class
+            self.info['class'] = self.info['class'].decode(encoding='ascii')
             self.info['space'] = struct.unpack('4s', file.read(4))[0]      # Color space of data
+            self.info['space'] = self.info['space'].decode(encoding='ascii')
             self.info['pcs'] = struct.unpack('4s', file.read(4))[0]        # Profile Connection Space
+            self.info['pcs'] = self.info['pcs'].decode(encoding='ascii')
             file.seek(128)
             tags = struct.unpack('>L', file.read(4))[0]
             self.info['tags'] = {}
             for i in range(tags):
                 tag = struct.unpack('>4s 2L', file.read(12))
-                self.info['tags'][tag[0]] = (tag[1], tag[2])
+                self.info['tags'][tag[0].decode(encoding='ascii')] = (tag[1], tag[2])
 
             try:
                 cprt = self.info['tags']['cprt']
@@ -78,6 +82,7 @@ class ICCprofile():
 
         # text and desc fields are supposed to be coded in plain
         # ascii but I've come across some mac_roman encoded
+        # TODO: Checkk this decoding
         if _type == b'text':
             content = struct.unpack('%is' % (size - 8), file.read(size - 8))[0]
             return {0: content.decode(encoding='mac_roman').split('\x00', 1)[0]}
@@ -100,5 +105,6 @@ class ICCprofile():
                 else:
                     lg = lang
                 c = struct.unpack('%is' % length, file.read(length))[0]
+                # TODO: Checkk this encoding utf_16_be
                 content[lg] = c.encode(encoding='utf_16_be').strip('\x00')
             return content
