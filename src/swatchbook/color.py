@@ -18,11 +18,11 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 #
-import os.path
+import os
 import math
+from pathlib import Path
 
 import swatchbook.lcms2 as lcms2
-# import swatchbook.icc as icc
 
 
 DblTriplet = lcms2.c_double * 3
@@ -30,11 +30,12 @@ DblQuad = lcms2.c_double * 4
 
 
 def dirpath(name):
-    if not name:
-        return name
-    if os.path.islink(name):
-        return os.path.dirname(os.path.abspath(os.path.realpath(name)))
-    return os.path.dirname(name)
+    name = name if name else ''
+    name = Path(name)
+    name.resolve()
+    if name.is_file():
+        return name.parent
+    return name
 
 
 def toRGB(model: str, values, prof_in=False, prof_out=False):
@@ -70,7 +71,7 @@ def toRGB(model: str, values, prof_in=False, prof_out=False):
     return (R, G, B)
 
 
-def lcms2RGB(model: str, values, prof_in=False, prof_out=False):
+def lcms2RGB(model: str, values, prof_in: Path = None, prof_out: Path = None):
     if not isinstance(model, str):
         raise TypeError()
 
@@ -84,43 +85,49 @@ def lcms2RGB(model: str, values, prof_in=False, prof_out=False):
          'sRGB': lcms2.TYPE_RGB_DBL,
          'CMYK': lcms2.TYPE_CMYK_DBL}
 
+    # input profile
     if prof_in:
-        inprof = lcms2.cmsOpenProfileFromFileTHR(context, prof_in, 'r')
+        inprof = lcms2.cmsOpenProfileFromFileTHR(context, os.fspath(prof_in), 'r')
     elif model == 'Lab':
         inprof = lcms2.cmsCreateLab4ProfileTHR(context, None)
     elif model == 'XYZ':
         inprof = lcms2.cmsCreateXYZProfileTHR(context)
     elif model == 'CMYK':
-        inprof = lcms2.cmsOpenProfileFromFileTHR(context, (dirpath(__file__) or ".") + "/Fogra27L.icm", 'r')
+        inprof = lcms2.cmsOpenProfileFromFileTHR(context,
+                                                 os.fspath(dirpath(__file__) / 'Fogra27L.icm'), 'r')
     else:
         inprof = lcms2.cmsCreate_sRGBProfileTHR(context)
 
+    # output profile
     if prof_out:
-        outprof = lcms2.cmsOpenProfileFromFileTHR(context, prof_out, 'r')
+        outprof = lcms2.cmsOpenProfileFromFileTHR(context, os.fspath(prof_out, 'r'))
     else:
         outprof = lcms2.cmsCreate_sRGBProfileTHR(context)
 
     if model in ('XYZ', ):
+        # FIXME: what!!
         inbuf = DblTriplet(*(v / 100 for v in values))
     elif model in ('CMYK', ):
+        # FIXME: what!!
         inbuf = DblQuad(*(v * 100 for v in values))
     else:
+        # FIXME: what!!
         inbuf = DblTriplet(*values)
 
+    # FIXME: what!!
     outbuf = DblTriplet()
     xform = lcms2.cmsCreateTransformTHR(context, inprof, t[model],
                                         outprof, t['RGB'],
                                         lcms2.INTENT_PERCEPTUAL, 0)
     lcms2.cmsCloseProfile(inprof)
     lcms2.cmsCloseProfile(outprof)
-
     lcms2.cmsDoTransform(xform, inbuf, outbuf, 1)
     lcms2.cmsDeleteTransform(xform)
 
     return tuple(outbuf)
 
 
-def RGB2RGB(RR, GG, BB, prof_in=False, prof_out=False):
+def RGB2RGB(RR, GG, BB, prof_in: Path = None, prof_out: Path = None):
     if prof_in == prof_out:
         return (RR, GG, BB)
     return lcms2RGB('RGB', (RR, GG, BB), prof_in, prof_out)
