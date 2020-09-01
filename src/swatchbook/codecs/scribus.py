@@ -33,14 +33,17 @@ class scribus(codecs.SBCodec):
     """Scribus Swatch."""
 
     @property
+    @staticmethod
     def ext():
         return ('xml',)
 
     @property
+    @staticmethod
     def isreader():
         return True
 
     @property
+    @staticmethod
     def iswriter():
         return True
 

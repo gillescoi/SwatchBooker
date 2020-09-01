@@ -30,14 +30,17 @@ class adobe_acb(codecs.SBCodec):
     """Adobe Color Book."""
 
     @property
+    @staticmethod
     def ext():
         return ('acb',)
 
     @property
+    @staticmethod
     def isreader():
         return True
 
     @property
+    @staticmethod
     def iswriter():
         return False
 

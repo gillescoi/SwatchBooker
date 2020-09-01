@@ -18,7 +18,6 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 #
-import os
 from pathlib import Path
 from abc import ABC, abstractmethod
 import importlib
@@ -33,10 +32,10 @@ from swatchbook.color import dirpath
 
 
 def idfromvals(vals):
-    id = []
+    ids = []
     for val in vals:
-        id.append(str(round(val, 3)))
-    return "(" + ", ".join(id) + ")"
+        ids.append(str(round(val, 3)))
+    return "(" + ", ".join(ids) + ")"
 
 
 def hex2(val):
@@ -56,16 +55,19 @@ def unicc(values):
 
 class SBCodec(ABC):
     @property
+    @staticmethod
     @abstractmethod
     def ext():
         return False
 
     @property
+    @staticmethod
     @abstractmethod
     def iswriter():
         return False
 
     @property
+    @staticmethod
     @abstractmethod
     def isreader():
         return False
