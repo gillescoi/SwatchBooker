@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 #
 #       Copyright 2008 Olivier Berten <olivier.berten@gmail.com>
