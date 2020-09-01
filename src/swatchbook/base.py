@@ -116,28 +116,26 @@ class SwatchBook():
         # test 2: extension
         ext = file.suffix.lower()
         if ext in codecs.readexts:
-            for codec in codecs.readexts[ext]:
+            for _codec in codecs.readexts[ext]:
                 test = False
                 try:
-                    test = getattr(codecs, codec).test(file)
+                    test = getattr(codecs, _codec).test(file)
                 except (IOError, SyntaxError, struct.error):
                     pass
                 if test:
-                    return codec
-            else:
-                codec = None
+                    return _codec
+            codec = None
 
         # test 3: free
-        for codec in codecs.reads:
+        for _codec in codecs.reads:
             test = False
             try:
-                test = getattr(codecs, codec).test(file)
+                test = getattr(codecs, _codec).test(file)
             except (IOError, SyntaxError, struct.error):
                 pass
             if test:
-                return codec
-        else:
-            codec = None
+                return _codec
+        codec = None
         return codec
 
     def webread(self, websvc_name, webid):
@@ -169,7 +167,7 @@ class SwatchBook():
 
 
 class Group():
-    def __init__(self, title='', parent=None):
+    def __init__(self, title=''):
         self.info = Info()
         self.info.title = title
         self.items = []
@@ -185,7 +183,7 @@ class Group():
 
 
 class Swatch():
-    def __init__(self, material, parent=None):
+    def __init__(self, material):
         self.material = material
 
 
@@ -221,31 +219,28 @@ class Color():
     def toRGB(self, prof_out=False):
         if not prof_out and ('sRGB', False) in self.values:
             return self.values[('sRGB', False)]
-        else:
-            for key in self.values:
-                if key[1]:
-                    prof_in = self.swatchbook.profiles[key[1]].uri
-                else:
-                    prof_in = False
-                if color.toRGB(key[0], self.values[key], prof_in, prof_out):
-                    return color.toRGB(key[0], self.values[key], prof_in, prof_out)
-                    break
+
+        for key in self.values:
+            if key[1]:
+                prof_in = self.swatchbook.profiles[key[1]].uri
             else:
-                return False
+                prof_in = False
+            if color.toRGB(key[0], self.values[key], prof_in, prof_out):
+                return color.toRGB(key[0], self.values[key], prof_in, prof_out)
+        return False
 
     def toRGB8(self, prof_out=False):
         RGB = self.toRGB(prof_out)
         if RGB:
             R, G, B = RGB
             return (int(round(R * 0xFF)), int(round(G * 0xFF)), int(round(B * 0xFF)))
-        else:
-            return False
+        return False
 
 
 class Tint():
     def __init__(self):
         self.info = Info()
-        self.color = False
+        self.color = None
         self.amount = False  # 1 = color, 0 = white
         self.usage = []      # for compatibility with colors
         self.extra = {}
@@ -261,14 +256,13 @@ class Tint():
         if RGB:
             R, G, B = RGB
             return (int(round(R * 0xFF)), int(round(G * 0xFF)), int(round(B * 0xFF)))
-        else:
-            return False
+        return False
 
 
 class Tone():
     def __init__(self):
         self.info = Info()
-        self.color = False
+        self.color = None
         self.amount = False  # 1 = color, 0 = gray
         self.usage = []      # for compatibility with colors
         self.extra = {}
@@ -285,14 +279,13 @@ class Tone():
         if RGB:
             R, G, B = RGB
             return (int(round(R * 0xFF)), int(round(G * 0xFF)), int(round(B * 0xFF)))
-        else:
-            return False
+        return False
 
 
 class Shade():
     def __init__(self):
         self.info = Info()
-        self.color = False
+        self.color = None
         self.amount = False  # 1 = color, 0 = black
         self.usage = []      # for compatibility with colors
         self.extra = {}
@@ -308,8 +301,7 @@ class Shade():
         if RGB:
             R, G, B = RGB
             return (int(round(R * 0xFF)), int(round(G * 0xFF)), int(round(B * 0xFF)))
-        else:
-            return False
+        return False
 
 
 class Pattern():
@@ -321,8 +313,7 @@ class Pattern():
     def indexed(self):
         if self.image().palette():
             return True
-        else:
-            return False
+        return False
 
     #TODO: SVG support
     def image(self):
@@ -383,10 +374,9 @@ class Gradient():
     def linear(position, midpoint):
         if position <= midpoint:
             return 0.5 * position / midpoint
-        else:
-            position -= midpoint
-            midpoint = 1.0 - midpoint
-            return 0.5 + 0.5 * position / midpoint
+        position -= midpoint
+        midpoint = 1.0 - midpoint
+        return 0.5 + 0.5 * position / midpoint
 
     @staticmethod
     def get_factor(interpolation, position, midpoint):
@@ -423,7 +413,7 @@ class Gradient():
                         h = left_hsv[0] + (right_hsv[0] - left_hsv[0]) * factor
                     else:
                         h = left_hsv[0] + (1.0 - (left_hsv[0] - right_hsv[0])) * factor
-                    if (h > 1.0):
+                    if  h > 1.0:
                         h -= 1.0
                 else:
                     h = left_hsv[0] + (right_hsv[0] - left_hsv[0]) * factor
