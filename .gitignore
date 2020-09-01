@@ -76,3 +76,4 @@ venv.bak/
 #
 .spyproject/
 tox.ini
+.old
