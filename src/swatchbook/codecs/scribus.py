@@ -49,10 +49,7 @@ class scribus(codecs.SBCodec):
 
     @staticmethod
     def test(file: Path):
-        if etree.parse(os.fspath(file)).getroot().tag == 'SCRIBUSCOLORS':
-            return True
-        else:
-            return False
+        return bool(etree.parse(os.fspath(file)).getroot().tag == 'SCRIBUSCOLORS')
 
     @staticmethod
     def read(swatchbook, file: Path):
@@ -63,7 +60,7 @@ class scribus(codecs.SBCodec):
         for elem in xml:
             if elem.tag == 'COLOR':
                 item = swbk.Color(swatchbook)
-                id = xmlunescape(elem.attrib['NAME'])
+                _id = xmlunescape(elem.attrib['NAME'])
                 if "RGB" in elem.attrib:
                     rgb = elem.attrib['RGB']
                     item.values[('RGB', False)] = [int(rgb[1:3], 16) / 0xFF,
@@ -80,24 +77,24 @@ class scribus(codecs.SBCodec):
 
             elif elem.tag == 'Gradient':
                 item = swbk.Gradient(swatchbook)
-                id = xmlunescape(elem.attrib['Name'])
+                _id = xmlunescape(elem.attrib['Name'])
                 opstops = []
                 for stops in elem:
                     if stops.tag == 'CSTOP':
                         stop = swbk.ColorStop()
-                        stop.position = eval(stops.attrib['RAMP'])
+                        stop.position = int(stops.attrib['RAMP'])
                         if stops.attrib['SHADE'] == '100':
                             stop.color = stops.attrib['NAME']
                         else:
                             tint = swbk.Tint()
                             tint.color = swatchbook.materials[stops.attrib['NAME']]
-                            tint.amount = eval(stops.attrib['SHADE']) / 100
+                            tint.amount = int(stops.attrib['SHADE']) / 100
                             tintid = stops.attrib['NAME'] + ' (Tint ' + stops.attrib['SHADE'] + '%)'
                             tint.info.identifier = tintid
                             swatchbook.materials[tintid] = tint
                             stop.color = tintid
                         item.colorstops.append(stop)
-                        opstops.append((stop.position, eval(stops.attrib['TRANS'])))
+                        opstops.append((stop.position, int(stops.attrib['TRANS'])))
 
                 if not (len(opstops) == 2 and opstops[0][1] == opstops[1][1]):
                     for i in range(len(opstops)):
@@ -109,25 +106,31 @@ class scribus(codecs.SBCodec):
                             stop.opacity = opstops[i][1]
                             item.opacitystops.append(stop)
 
-            if not id or id == '':
-                id = codecs.idfromvals(item.values[item.values.keys()[0]])
-            if id in swatchbook.materials:
-                if item.values[item.values.keys()[0]] == swatchbook.materials[id].values[swatchbook.materials[id].values.keys()[0]]:
-                    swatchbook.book.items.append(swbk.Swatch(id))
+            if not _id or _id == '':
+                _id = codecs.idfromvals(item.values[item.values.keys()[0]])
+            if _id in swatchbook.materials:
+                if item.values[item.values.keys()[0]] == swatchbook.materials[_id].values[swatchbook.materials[_id].values.keys()[0]]:
+                    swatchbook.book.items.append(swbk.Swatch(_id))
                     continue
                 else:
-                    sys.stderr.write('duplicated id: ' + id + '\n')
-                    item.info.title = id
-                    id = id + codecs.idfromvals(item.values[item.values.keys()[0]])
-            item.info.identifier = id
-            swatchbook.materials[id] = item
-            swatchbook.book.items.append(swbk.Swatch(id))
+                    sys.stderr.write('duplicated id: ' + _id + '\n')
+                    item.info.title = _id
+                    _id = _id + codecs.idfromvals(item.values[item.values.keys()[0]])
+            item.info.identifier = _id
+            swatchbook.materials[_id] = item
+            swatchbook.book.items.append(swbk.Swatch(_id))
 
     @staticmethod
     def write(swatchbook):
         scsw = '<?xml version="1.0" encoding="UTF-8"?>\n<SCRIBUSCOLORS Name="' + xmlescape(swatchbook.info.title) + '">\n'
+        scsw += scribus.writem(swatchbook, swatchbook.book.items)
+        scsw += '</SCRIBUSCOLORS>'
+        return scsw.encode('utf-8')
+
+    @staticmethod
+    def writem(swatchbook, items):
         scsw_tmp = ''
-        for item in swatchbook.book.items:
+        for item in items:
             if isinstance(item, swbk.Swatch):
                 item = swatchbook.materials[item.material]
                 if isinstance(item, swbk.Color):
@@ -135,8 +138,7 @@ class scribus(codecs.SBCodec):
                     scsw_tmp += ' <COLOR '
                     if 'CMYK' in values:
                         C, M, Y, K = values['CMYK']
-                        scsw_tmp += 'CMYK="#' + codecs.hex2(C * 0xFF) + codecs.hex2(M * 0xFF)
-                        + codecs.hex2(Y * 0xFF) + codecs.hex2(K * 0xFF) + '"'
+                        scsw_tmp += 'CMYK="#' + codecs.hex2(C * 0xFF) + codecs.hex2(M * 0xFF) + codecs.hex2(Y * 0xFF) + codecs.hex2(K * 0xFF) + '"'
                     elif 'GRAY' in values:
                         K = values['GRAY'][0]
                         scsw_tmp += 'CMYK="#000000' + codecs.hex2(K * 0xFF) + '"'
@@ -154,7 +156,4 @@ class scribus(codecs.SBCodec):
                     scsw_tmp += ' />\n'
             elif isinstance(item, swbk.Group):
                 scsw_tmp += scribus.writem(swatchbook, item.items)
-
-        scsw += scsw_tmp
-        scsw += '</SCRIBUSCOLORS>'
-        return scsw.encode('utf-8')
+        return scsw_tmp
