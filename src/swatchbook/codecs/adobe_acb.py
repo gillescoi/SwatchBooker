@@ -46,19 +46,16 @@ class adobe_acb(codecs.SBCodec):
 
     @staticmethod
     def test(file: Path):
-        with open(file, 'rb') as file:
-            data = file.read(4)
-        if struct.unpack('4s', data)[0] == b'8BCB':
-            return True
-        else:
-            return False
+        with open(file, 'rb') as stream:
+            data = stream.read(4)
+        return bool(struct.unpack('4s', data)[0] == b'8BCB')
 
     @staticmethod
     def read(swatchbook, file):
         def decode_str(text_string):
             if text_string[0:4] == '$$$/':
                 text_string = text_string.partition('=')[2]
-            return text_string.replace('^C', u'©').replace('^R', u'®')
+            return text_string.replace('^C', '©').replace('^R', '®')
 
         with open(file, 'rb') as stream:
             # Title
@@ -103,7 +100,7 @@ class adobe_acb(codecs.SBCodec):
                     tmp = struct.unpack('%ss' % (length * 2), stream.read(length * 2))[0]
                     item.info.title = prefix + decode_str(tmp.decode(encoding='utf_16_be')) + suffix
 
-                id = struct.unpack('>6s', stream.read(6))[0].strip().decode(encoding='ASCII')
+                _id = struct.unpack('>6s', stream.read(6))[0].strip().decode(encoding='ASCII')
 
                 if model == 0:
                     R, G, B = struct.unpack('>3B', stream.read(3))
@@ -121,22 +118,22 @@ class adobe_acb(codecs.SBCodec):
                     swatchbook.book.items.append(swbk.Spacer())
                     continue
 
-                if id in swatchbook.materials:
-                    if item.values[item.values.keys()[0]] == swatchbook.materials[id].values[swatchbook.materials[id].values.keys()[0]]:
-                        swatchbook.book.items.append(swbk.Swatch(id))
+                if _id in swatchbook.materials:
+                    if item.values[item.values.keys()[0]] == swatchbook.materials[_id].values[swatchbook.materials[_id].values.keys()[0]]:
+                        swatchbook.book.items.append(swbk.Swatch(_id))
                         continue
                     else:
-                        sys.stderr.write('duplicated id: %i\n' % id)
-                        id = id + codecs.idfromvals(item.values[item.values.keys()[0]])
-                elif len(id) == 0:
-                    id = codecs.idfromvals(item.values[item.values.keys()[0]])
+                        sys.stderr.write('duplicated id: %i\n' % _id)
+                        _id = _id + codecs.idfromvals(item.values[item.values.keys()[0]])
+                elif len(_id) == 0:
+                    _id = codecs.idfromvals(item.values[item.values.keys()[0]])
 
-                item.info.identifier = id
-                swatchbook.materials[id] = item
-                swatchbook.book.items.append(swbk.Swatch(id))
+                item.info.identifier = _id
+                swatchbook.materials[_id] = item
+                swatchbook.book.items.append(swbk.Swatch(_id))
 
             if stream.read(4):
                 if struct.unpack('>4s', stream.read(4))[0] == b'spot':
-                    for id in swatchbook.materials:
-                        if isinstance(swatchbook.materials[id], swbk.Color):
-                            swatchbook.materials[id].usage.add('spot')
+                    for _id in swatchbook.materials:
+                        if isinstance(swatchbook.materials[_id], swbk.Color):
+                            swatchbook.materials[_id].usage.add('spot')
