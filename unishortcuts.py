@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 from distutils.core import Command
 from distutils.command.build import build
-
+import distutils.command
 
 __ALL__ = ['build', 'build_shortcuts', 'Shortcut']
 
@@ -44,22 +44,8 @@ def _get_platform():
         return 'linux'
 
 
-_here = Path(__file__).parent.resolve()
+_here = Path.cwd()
 
-_LINUX_DESKTOP_FORM = """[Desktop Entry]
-Version=1.1
-Encoding=UTF-8
-Name={name:s}
-GenericName={gname:s}
-Type=Application
-Comment={desc:s}
-Categories={cat:s}
-Keywords={keys:s}
-Icon={icon:s}
-Exec={script:s} {args:s}
-TryExec={script:s}
-Terminal={term:s}
-"""
 
 _FREE_DESKTOP_CATEGORIES = ['AudioVideo', 'Audio', 'Video', 'Development',
                             'Education', 'Game', 'Graphics', 'Network',
@@ -105,23 +91,24 @@ class Shortcut():
                   Defaults to None.
     keywords:     A list of strings which may be used in addition to other
                   metadata to describe this entry. Defaults to None.
-    mime_type:    The MIME type(s) supported by this application. Defaults to None.
+    mime_types:   A list of strings for MIME type(s) supported by
+                  this application. Defaults to None.
     """
 
     _instances = set()
 
     def __new__(cls, script, name=None, generic_name=None, description=None,
                 icon=None, arguments=None, special_arg=None, category=None,
-                keywords=None, mime_type=None):
+                keywords=None, mime_types=None):
         instance = super(Shortcut, cls).__new__(cls)
         cls.__init__(instance, script, name, generic_name, description, icon,
-                     arguments, special_arg, category, keywords, mime_type)
+                     arguments, special_arg, category, keywords, mime_types)
         cls._instances.add(instance)
         return instance
 
     def __init__(self, script, name=None, generic_name=None, description=None,
                  icon=None, arguments=None, special_arg=None, category=None,
-                 keywords=None, mime_type=None):
+                 keywords=None, mime_types=None):
         self.script = script
         self.name = name
         self.generic_name = generic_name
@@ -131,7 +118,7 @@ class Shortcut():
         self.special_arg = special_arg
         self.category = category
         self.keywords = keywords
-        self.mime_type = mime_type
+        self.mime_types = mime_types
 
     @property
     def script(self):
@@ -176,8 +163,8 @@ class Shortcut():
         else:
             self._icon = [Path(s)] if s else []
         for i in self._icon:
-            if i.root != _here:
-                raise(AttributeError('icon %s path not inside source directory' % i))
+            if not i.resolve().relative_to(_here):
+                raise(AttributeError('icon %s path outside of distribution\'s directory' % i))
 
     @property
     def arguments(self):
@@ -236,17 +223,17 @@ class Shortcut():
             raise(TypeError())
 
     @property
-    def mime_type(self):
-        return self._mime_type
+    def mime_types(self):
+        return self._mime_types
 
-    @mime_type.setter
-    def mime_type(self, s):
+    @mime_types.setter
+    def mime_types(self, s):
         if isinstance(s, list):
-            self._mime_type = [str(i) for i in s]
+            self._mime_types = [str(i) for i in s]
         elif isinstance(s, str):
-            self._mime_type = re.split(r',\s*|\s+', s)
+            self._mime_types = re.split(r',\s*|\s+', s)
         elif s is None:
-            self._mime_type = []
+            self._mime_types = []
         else:
             raise(TypeError())
 
@@ -267,35 +254,60 @@ class build_shortcuts(Command):
 
     command_name = 'build_shortcuts'
     description = 'build_shortcuts'
-    user_options = [('build-base=', None, 'directory to "build" (copy) to'),
-                    ('desktop=', None, 'path to Pylint config file')]
+    user_options = [('build-base=', None, 'directory to "build" (copy) to')]
 
     def initialize_options(self):
         """Set default values for options."""
         self.build_base = None
-        self.desktop = None
 
     def finalize_options(self):
         """Post-process options."""
-        if self.desktop:
-            pass
         self.set_undefined_options('build', ('build_base', 'build_base'))
+        self.build_desktop = Path(self.build_base) / 'desktop'
 
     def run(self):
         """Run command."""
-        # look for enrty_points
+        # look for enrty_pointsargs
         group = 'console_scripts'
         if hasattr(self.distribution, 'entry_points') and group in self.distribution.entry_points:
             for ep in self.distribution.entry_points[group]:
                 shortcut = self._get_metadatas(ep.split('=')[0].strip())
-
-                # _LINUX_DESKTOP_FORM.format(name=name, desc=desc,
-        #                            exe=executable, icon=scut.icon,
-        #                            script=scut.full_script, args=scut.arguments,
-        #                            term='true' if terminal else 'false')
+                self._make_linux_shortcut(shortcut)
         else:
             self.warn('no entry_points found')
-        self.warn(self.distribution.metadata.get_classifiers())
+
+    def _make_linux_shortcut(self, shortcut):
+        lines = ['[Desktop Entry]', 'Version=1.1', 'Encoding=UTF-8', 'Type=Application']
+        lines.append('Name=%s' % shortcut.name)
+        lines.append('Name=%s' % shortcut.name)
+        if shortcut.generic_name:
+            lines.append('GenericName=%s' % shortcut.generic_name)
+        if shortcut.description:
+            lines.append('Comment=%s' % shortcut.description)
+        if shortcut.category:
+            lines.append('Categories=%s' % shortcut.category)
+        if shortcut.keywords:
+            lines.append('Keywords=%s' % ';'.join(shortcut.keywords))
+        if shortcut.icon:
+            lines.append('Icon=%s' % Path(shortcut.icon[0]).stem)
+        else:
+            # TODO: What if none
+            pass
+        lines.append('Exec=%s %s %s' % (shortcut.script,
+                                        ' '.join(shortcut.arguments),
+                                        shortcut.special_arg))
+        lines.append('TryExec=%s' % shortcut.script)
+        lines.append('Terminal=false')
+        if shortcut.mime_types:
+            lines.append('MimeType=%s' % ';'.join(shortcut.mime_types))
+        self.mkpath(self.build_desktop)
+        file = self.build_desktop / Path(shortcut.name).with_suffix('desktop')
+        self.execute(self._write_file, (self, file, lines, 'UTF-8'))
+
+    def _write_file(self, file, sequence, encoding=None):
+        with file.open('w', encoding=encoding) as f:
+            for line in sequence:
+                f.write(line + "\n")
 
     def _get_metadatas(self, script):
         # If user didn't created a Shortcut object,
@@ -311,6 +323,7 @@ class build_shortcuts(Command):
         # generic_name
         if not shortcut.generic_name:
             shortcut.generic_name = shortcut.name
+        # TODO: follow this mechanisme
         # icon
         if not shortcut.icon:
             data = _here / 'data'
